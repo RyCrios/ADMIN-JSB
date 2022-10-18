@@ -1,0 +1,82 @@
+@colorMain: #1890ff;
+@colorError: #ff4368;
+@colorWaning: #ffa623;
+@colorSuccess: #1ebfa0;
+
+@colorText: #161c20;
+
+@colorModel: #45494e;
+
+@sizeSmall: 14px;
+@lineHSmall: 22px;
+
+@sizeMiddle: 16px;
+@lineHMiddle: 24px;
+
+@sizeLarge: 18px;
+@lineHLarge: 26px;
+
+@radio: 4px;
+@shadow: rgba(50, 50, 105, 0.15) 0px 2px 5px 0px,
+rgba(0, 0, 0, 0.05) 0px 1px 1px 0px;
+
+* {
+    box-sizing: border-box;
+}
+*::-webkit-scrollbar {
+    width: 3px;
+    height: 1px;
+}
+
+*::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background: #1990ffc3;
+}
+
+*::-webkit-scrollbar-track {
+    -webkit-box-shadow: inset 0 0 1px rgb(0 0 0 / 0%);
+    border-radius: 3px;
+    background: #62c9e300;
+}
+
+body,
+html {
+    padding: 0;
+    margin: 0;
+}
+
+
+/* Clearfix hack by Nicolas Gallagher: http://nicolasgallagher.com/micro-clearfix-hack/ */
+.clearfix:before,
+.clearfix:after {
+    content: " ";
+    display: table;
+}
+
+.clearfix:after {
+    clear: both;
+}
+
+a {
+    color: #2fa0ec;
+    text-decoration: none;
+    outline: none;
+}
+
+a:hover,
+a:focus {
+    color: #74777b;
+}
+
+.ov-2 {
+    width: 100%;
+
+    /* 溢出隐藏 */
+    overflow: hidden;
+    display: -webkit-box;
+    /*这里写显示的行数 */
+    -webkit-line-clamp: 2;
+    /* vertical表示垂直排列 */
+    -webkit-box-orient: vertical;
+}
+
