@@ -6,25 +6,25 @@ import MyLoading from '@c/MyLoading/index.vue'
 import MySift from '@c/MySift/index.vue'
 
 // import ui
-import { EditTwoTone, DeleteTwoTone } from '@ant-design/icons-vue'
+import { EditTwoTone, DeleteTwoTone, ApiTwoTone } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 // import api
 import {
-  POST_LIST,
-  POST_ITEM,
-  DELECT_ITEM,
-  PUT_ITEM,
-  GET_DETAIL
-} from '@a/item'
-import { GET_LIST } from '@a/department'
-import { GET_DICT_DATA_TYPE } from '@a/dict'
+  POST_ROLE_LIST,
+  POST_ROLE_ADD,
+  DELETE_ROLE_ID,
+  PUT_ROLE_UPDATE,
+  GET_ROLE_DETAIL,
+  POST_ROLE_MENU
+} from '@a/role'
+import { GET_TREE } from '@a/menu'
 // import other
 import Utils from '@u/Utils'
 import config from './config'
 //if error; please run npm install unplugin-vue-define-options -D
 //设置vue组件名称
 defineOptions({
-  name: 'Item'
+  name: 'Role'
 })
 
 // vue api
@@ -48,6 +48,10 @@ const page = reactive({
 const state = reactive({
   //  表单是否展示
   show: false,
+  //  额外功能信息
+  showMore: false,
+  //  额外业务标题
+  title: '',
   //  业务提交类型
   dataType: true,
   //  加载状态
@@ -58,7 +62,7 @@ const data = reactive({
   methods: {
     async list(params) {
       state.loading = true
-      const res = await POST_LIST(params || page)
+      const res = await POST_ROLE_LIST(params || page)
       if (res && res.code == 200) {
         data.list = res.data
         page.total = res.total
@@ -82,16 +86,17 @@ const form = reactive({
   //  新增业务模型
   add: {
     name: '',
-    workObject: null,
-    itemType: null,
-    departmentId: null,
-    transactType: null,
-    isCharge: 0,
-    chargeDescription: '',
-    description: ''
+    status: null,
+    description: '',
+    code: ''
   },
   //  编辑业务模型
   edit: {},
+  //  菜单配置
+  menuId: {
+    roleId: null,
+    menuids: []
+  },
   methods: {
     //  返回对应按钮状态下的数据结构,让表单动态绑定不同数据模式
     model() {
@@ -102,8 +107,28 @@ const form = reactive({
       state.show = true
       state.dataType = true
     },
+    async menu(id) {
+      const res = await GET_ROLE_DETAIL(id)
+      form.menuId.roleId = res.data.id
+      form.menuId.menuIds = res.data.menuIds
+      state.showMore = true
+      state.title = '菜单配置'
+    },
+    async setMenu() {
+      let c = form.menuId.menuIds.toString()
+
+      const res = await POST_ROLE_MENU({
+        ...form.menuId,
+        menuIds: form.menuId.menuIds.toString()
+      })
+      if (res && res.code == 200) {
+        message.success(res.message)
+        state.showMore = false
+        state.title = ''
+      }
+    },
     async del(id) {
-      const res = await DELECT_ITEM(id)
+      const res = await DELETE_ROLE_ID(id)
       if (res && res.code == 200) {
         message.success(res.message)
         page.pageNum = 1
@@ -113,7 +138,7 @@ const form = reactive({
       }
     },
     async edit(id) {
-      const res = await GET_DETAIL(id)
+      const res = await GET_ROLE_DETAIL(id)
       form.edit = Utils.objectData(res.data, form.add)
       form.edit['id'] = id
       state.show = true
@@ -123,7 +148,7 @@ const form = reactive({
       MyForm?.value.resetFields()
     },
     async onFinish(values) {
-      let callback = state.dataType ? POST_ITEM : PUT_ITEM
+      let callback = state.dataType ? POST_ROLE_ADD : PUT_ROLE_UPDATE
       const res = await callback(form.methods.model())
       if (res && res.code == 200) {
         message.success(res.message)
@@ -137,32 +162,17 @@ const form = reactive({
   }
 })
 const dict = reactive({
-  departmentId: [],
-  isCharge: [],
-  transactType: [],
-  workObject: [],
-  itemType: [],
+  menu: [],
   methods: {
-    async get_departmentId() {
-      const res = await GET_LIST()
+    async get_menu() {
+      const res = await GET_TREE()
       if (res && res.code == 200) {
-        dict.departmentId = Utils.editDictConfig(res.data, {
-          label: 'name',
-          value: 'id',
-          id: 'id'
-        })
-      }
-    },
-    async getDictAll(types) {
-      const res = await GET_DICT_DATA_TYPE(types)
-      if (res && res.code == 200) {
-        debugger
+        dict.menu = res.data
       }
     }
   },
   created() {
-    dict.methods.get_departmentId()
-    dict.methods.getDictAll(['work_object', 'item_type', 'is_charge'])
+    dict.methods.get_menu()
   }
 })
 
@@ -204,6 +214,17 @@ const { search, columns } = config(dict)
               >
                 <template #icon>
                   <edit-two-tone />
+                </template>
+              </a-button>
+              <!-- 配置菜单 -->
+              <a-button
+                type="link"
+                shape="circle"
+                title="菜单"
+                @click="form.methods.menu(record.id)"
+              >
+                <template #icon>
+                  <api-two-tone />
                 </template>
               </a-button>
               <!-- 删除 -->
@@ -253,92 +274,22 @@ const { search, columns } = config(dict)
         autocomplete="off"
         @finish="form.methods.onFinish"
       >
-        <a-form-item label="事项名称" required name="name">
+        <a-form-item label="角色名称" required name="name">
           <a-input
             v-model:value="form.methods.model().name"
             placeholder="请输入事项名称"
           />
         </a-form-item>
-        <a-form-item label="相关部门" required name="departmentId">
-          <a-select
-            v-model:value="form.methods.model().departmentId"
-            placeholder="请选择相关部门"
+        <a-form-item label="状态" required name="status">
+          <a-radio-group
+            v-model:value="form.methods.model().status"
+            button-style="solid"
           >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.departmentId"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="申报对象" required name="workObject">
-          <a-select
-            v-model:value="form.methods.model().workObject"
-            placeholder="请选择申报对象"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.workObject"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="事项类型" required name="itemType">
-          <a-select
-            v-model:value="form.methods.model().itemType"
-            placeholder="请选择事项类型"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.itemType"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="办理方式" required name="transactType">
-          <a-select
-            v-model:value="form.methods.model().transactType"
-            placeholder="请选择办理方式"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.transactType"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="是否收费" required name="isCharge">
-          <a-select
-            v-model:value="form.methods.model().isCharge"
-            placeholder="请选择是否收费"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.isCharge"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item
-          label="收费说明"
-          :required="form.methods.model().isCharge != 0"
-          name="chargeDescription"
-        >
-          <a-textarea
-            v-model:value="form.methods.model().chargeDescription"
-            placeholder="请输入收费说明"
-            allow-clear
-          />
+            <a-radio-button value="a">Hangzhou</a-radio-button>
+            <a-radio-button value="b">Shanghai</a-radio-button>
+            <a-radio-button value="c">Beijing</a-radio-button>
+            <a-radio-button value="d">Chengdu</a-radio-button>
+          </a-radio-group>
         </a-form-item>
         <a-form-item label="事项描述" name="description">
           <a-textarea
@@ -349,6 +300,28 @@ const { search, columns } = config(dict)
         </a-form-item>
         <a-form-item :wrapper-col="{ offset: 6, span: 18 }">
           <a-button type="primary" html-type="submit">提交</a-button>
+        </a-form-item>
+      </a-form>
+    </a-drawer>
+    <a-drawer
+      v-model:visible="state.showMore"
+      :title="state.title"
+      placement="right"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 18 }">
+        <a-form-item label="菜单树">
+          <a-tree-select
+            v-model:value="form.menuId.menuIds"
+            :tree-data="dict.menu"
+            allow-clear
+            multiple
+            show-checked-strategy="SHOW_ALL"
+            tree-default-expand-all
+            placeholder="请选择菜单"
+          />
+        </a-form-item>
+        <a-form-item :wrapper-col="{ offset: 6, span: 18 }">
+          <a-button type="primary" @click="form.methods.setMenu">提交</a-button>
         </a-form-item>
       </a-form>
     </a-drawer>

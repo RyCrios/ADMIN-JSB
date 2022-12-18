@@ -10,21 +10,23 @@ import { EditTwoTone, DeleteTwoTone } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 // import api
 import {
-  POST_LIST,
-  POST_ITEM,
-  DELECT_ITEM,
-  PUT_ITEM,
-  GET_DETAIL
-} from '@a/item'
-import { GET_LIST } from '@a/department'
-import { GET_DICT_DATA_TYPE } from '@a/dict'
+  POST_DICT_LIST,
+  POST_DICT_ADD,
+  DELETE_DICT_ID,
+  PUT_DICT_UPDATE,
+  GET_DICT_DETAIL,
+  GET_DICT_DATA_TYPE,
+  DELETE_DICT_DATA_ID,
+  POST_DICT_DATA_ADD
+} from '@a/dict'
+
 // import other
 import Utils from '@u/Utils'
 import config from './config'
 //if error; please run npm install unplugin-vue-define-options -D
 //设置vue组件名称
 defineOptions({
-  name: 'Item'
+  name: 'Dict'
 })
 
 // vue api
@@ -55,10 +57,11 @@ const state = reactive({
 })
 const data = reactive({
   list: [],
+  dataList: [],
   methods: {
     async list(params) {
       state.loading = true
-      const res = await POST_LIST(params || page)
+      const res = await POST_DICT_LIST(params || page)
       if (res && res.code == 200) {
         data.list = res.data
         page.total = res.total
@@ -81,17 +84,20 @@ const data = reactive({
 const form = reactive({
   //  新增业务模型
   add: {
-    name: '',
-    workObject: null,
-    itemType: null,
-    departmentId: null,
-    transactType: null,
-    isCharge: 0,
-    chargeDescription: '',
-    description: ''
+    dictName: '',
+    dictType: '',
+    remark: ''
   },
   //  编辑业务模型
   edit: {},
+  //  编辑扩展属性表达
+  newEdit: {
+    dictLabel: '',
+    dictValue: '',
+    dictTypeId: null,
+    dictType: '',
+    isDefault: 'N'
+  },
   methods: {
     //  返回对应按钮状态下的数据结构,让表单动态绑定不同数据模式
     model() {
@@ -103,7 +109,7 @@ const form = reactive({
       state.dataType = true
     },
     async del(id) {
-      const res = await DELECT_ITEM(id)
+      const res = await DELETE_DICT_ID(id)
       if (res && res.code == 200) {
         message.success(res.message)
         page.pageNum = 1
@@ -112,8 +118,43 @@ const form = reactive({
         message.warning(res.message)
       }
     },
+    async delData(row) {
+      const res = await DELETE_DICT_DATA_ID(row.id)
+      if (res && res.code == 200) {
+        data.dataList.splice(data.dataList.indexOf(row), 1)
+        message.success(res.message)
+      } else {
+        message.warning(res.message)
+      }
+    },
+    async setData() {
+      if (
+        form.newEdit.dictLabel.trim() == '' ||
+        form.newEdit.dictValue.trim() == ''
+      ) {
+        message.warning('请设置对应属性或键值进行添加！')
+        return
+      }
+      const res = await POST_DICT_DATA_ADD(form.newEdit)
+      if (res && res.code == 200) {
+        const dictData = await GET_DICT_DATA_TYPE(form.newEdit.dictType)
+        data.dataList = dictData.data
+        form.newEdit = {
+          dictLabel: '',
+          dictValue: '',
+          dictTypeId: null,
+          dictType: '',
+          isDefault: 'N'
+        }
+        message.success(res.message)
+      }
+    },
     async edit(id) {
-      const res = await GET_DETAIL(id)
+      const res = await GET_DICT_DETAIL(id)
+      form.newEdit.dictType = res.data.dictType
+      form.newEdit.dictTypeId = res.data.id
+      const dictData = await GET_DICT_DATA_TYPE(res.data.dictType)
+      data.dataList = dictData.data
       form.edit = Utils.objectData(res.data, form.add)
       form.edit['id'] = id
       state.show = true
@@ -123,7 +164,7 @@ const form = reactive({
       MyForm?.value.resetFields()
     },
     async onFinish(values) {
-      let callback = state.dataType ? POST_ITEM : PUT_ITEM
+      let callback = state.dataType ? POST_DICT_ADD : PUT_DICT_UPDATE
       const res = await callback(form.methods.model())
       if (res && res.code == 200) {
         message.success(res.message)
@@ -137,33 +178,8 @@ const form = reactive({
   }
 })
 const dict = reactive({
-  departmentId: [],
-  isCharge: [],
-  transactType: [],
-  workObject: [],
-  itemType: [],
-  methods: {
-    async get_departmentId() {
-      const res = await GET_LIST()
-      if (res && res.code == 200) {
-        dict.departmentId = Utils.editDictConfig(res.data, {
-          label: 'name',
-          value: 'id',
-          id: 'id'
-        })
-      }
-    },
-    async getDictAll(types) {
-      const res = await GET_DICT_DATA_TYPE(types)
-      if (res && res.code == 200) {
-        debugger
-      }
-    }
-  },
-  created() {
-    dict.methods.get_departmentId()
-    dict.methods.getDictAll(['work_object', 'item_type', 'is_charge'])
-  }
+  methods: {},
+  created() {}
 })
 
 data.created()
@@ -253,97 +269,22 @@ const { search, columns } = config(dict)
         autocomplete="off"
         @finish="form.methods.onFinish"
       >
-        <a-form-item label="事项名称" required name="name">
+        <a-form-item label="字典名称" required name="dictName">
           <a-input
-            v-model:value="form.methods.model().name"
-            placeholder="请输入事项名称"
+            v-model:value="form.methods.model().dictName"
+            placeholder="请输入字典名称"
           />
         </a-form-item>
-        <a-form-item label="相关部门" required name="departmentId">
-          <a-select
-            v-model:value="form.methods.model().departmentId"
-            placeholder="请选择相关部门"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.departmentId"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="申报对象" required name="workObject">
-          <a-select
-            v-model:value="form.methods.model().workObject"
-            placeholder="请选择申报对象"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.workObject"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="事项类型" required name="itemType">
-          <a-select
-            v-model:value="form.methods.model().itemType"
-            placeholder="请选择事项类型"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.itemType"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="办理方式" required name="transactType">
-          <a-select
-            v-model:value="form.methods.model().transactType"
-            placeholder="请选择办理方式"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.transactType"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="是否收费" required name="isCharge">
-          <a-select
-            v-model:value="form.methods.model().isCharge"
-            placeholder="请选择是否收费"
-          >
-            <a-select-option
-              :value="item.value"
-              v-for="item in dict.isCharge"
-              :key="item.id"
-            >
-              <span>{{ item.label }}</span>
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item
-          label="收费说明"
-          :required="form.methods.model().isCharge != 0"
-          name="chargeDescription"
-        >
-          <a-textarea
-            v-model:value="form.methods.model().chargeDescription"
-            placeholder="请输入收费说明"
-            allow-clear
+        <a-form-item label="字典类型" required name="dictType">
+          <a-input
+            v-model:value="form.methods.model().dictType"
+            placeholder="请输入字典类型"
           />
         </a-form-item>
-        <a-form-item label="事项描述" name="description">
+        <a-form-item label="字典描述" name="remark">
           <a-textarea
-            v-model:value="form.methods.model().description"
-            placeholder="请输入事项描述"
+            v-model:value="form.methods.model().remark"
+            placeholder="请输入字典描述"
             allow-clear
           />
         </a-form-item>
@@ -351,6 +292,61 @@ const { search, columns } = config(dict)
           <a-button type="primary" html-type="submit">提交</a-button>
         </a-form-item>
       </a-form>
+      <template v-if="!state.dataType">
+        <a-input-group size="default" style="margin-bottom: 8px">
+          <a-row>
+            <a-col :span="9">
+              <a-input
+                v-model:value="form.newEdit.dictLabel"
+                placeholder="属性"
+              />
+            </a-col>
+            <a-col :span="9">
+              <a-input
+                v-model:value="form.newEdit.dictValue"
+                placeholder="键值"
+              />
+            </a-col>
+            <a-col :span="6" style="padding: 0 8px">
+              <a-button
+                block
+                shape="round"
+                type="primary"
+                @click="form.methods.setData"
+                >添加属性</a-button
+              >
+            </a-col>
+          </a-row>
+        </a-input-group>
+        <a-table
+          size="small"
+          :columns="[
+            { title: '属性', dataIndex: 'dictLabel' },
+            { title: '键值', dataIndex: 'dictValue' },
+            { title: '操作', dataIndex: 'operation', align: 'center' }
+          ]"
+          :data-source="data.dataList"
+          :pagination="false"
+        >
+          <template #bodyCell="{ text, record, index, column }">
+            <template v-if="column.dataIndex === 'operation'">
+              <!-- 删除 -->
+              <a-popconfirm
+                title="是否确认删除？"
+                ok-text="确认"
+                cancel-text="取消"
+                @confirm="form.methods.delData(record)"
+              >
+                <a-button type="link" shape="circle" danger title="删除">
+                  <template #icon>
+                    <delete-two-tone two-tone-color="#eb2f96" />
+                  </template>
+                </a-button>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+      </template>
     </a-drawer>
   </div>
 </template>
